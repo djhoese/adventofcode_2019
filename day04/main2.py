@@ -1,4 +1,5 @@
 import sys
+from collections import Counter
 
 START = 359282
 END = 820401
@@ -18,14 +19,8 @@ def main():
                             num_tuple = (d1, d2, d3, d4, d5, d6)
                             if num_tuple < start_tuple or num_tuple > end_tuple:
                                 break
-                            equal_digits = [d1 == d2, d2 == d3, d3 == d4, d4 == d5, d5 == d6]
-                            if (
-                                    (equal_digits[0] and not equal_digits[1]) or
-                                    (not equal_digits[0] and equal_digits[1] and not equal_digits[2]) or
-                                    (not equal_digits[1] and equal_digits[2] and not equal_digits[3]) or
-                                    (not equal_digits[2] and equal_digits[3] and not equal_digits[4]) or
-                                    (not equal_digits[3] and equal_digits[4])
-                            ):
+                            c = set(Counter(num_tuple).values())
+                            if c & {2}:
                                 count += 1
 
     print(count)
