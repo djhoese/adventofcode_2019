@@ -19,9 +19,7 @@ def main():
                             num_tuple = (d1, d2, d3, d4, d5, d6)
                             if num_tuple < start_tuple or num_tuple > end_tuple:
                                 break
-                            c = set(Counter(num_tuple).values())
-                            if c & {2}:
-                                count += 1
+                            count += bool(set(Counter(num_tuple).values()) & {2})
 
     print(count)
 
