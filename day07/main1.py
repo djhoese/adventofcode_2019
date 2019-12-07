@@ -30,7 +30,6 @@ def amp(instructions, phase_settings, amp_input=None, feedback_loop=False):
         for out_val in amp(instructions, phase_settings[1:], amp_input=stdout_gen):
             amp_input.append(out_val)
             yield out_val
-        # amp_input.append(None)
     else:
         yield from amp(instructions, phase_settings[1:], amp_input=stdout_gen)
 
