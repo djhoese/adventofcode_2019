@@ -44,10 +44,9 @@ def run_program(instructions, stdin=sys.stdin, stdout=sys.stdout, noun=None, ver
         elif opcode == 4:
             # STDOUT
             arg1, = get_args(instructions, ip, param_modes, 1)
-            if stdout is sys.stdout:
-                print(arg1)
-            else:
-                stdout.append(arg1)
+            if hasattr(stdout, 'write'):
+                print(arg1, file=stdout)
+            yield arg1
             ip += 2
         elif opcode == 5:
             # JMPT

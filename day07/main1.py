@@ -4,23 +4,40 @@ import numpy as np
 from intcode import run_program
 
 
-def fake_stdin(permutation):
-    for phase_setting in permutation:
-        yield phase_setting
+def patient_generator(growing_list):
+    idx = 0
+    while True:
+        if idx >= len(growing_list):
+            continue
+        val = growing_list[idx]
+        if val is None:
+            break
+        idx += 1
+        yield val
 
 
-def amp(instructions, phase_settings, input=[0]):
-    stdin = chain([phase_settings[0]], input)
-    stdout = []
-    run_program(instructions.copy(), stdin=stdin, stdout=stdout)
+def amp(instructions, phase_settings, amp_input=None, feedback_loop=False):
+    if amp_input is None:
+        amp_input = [0]
+        stdin = chain([phase_settings[0]], patient_generator(amp_input))
+    else:
+        stdin = chain([phase_settings[0]], amp_input)
+
+    stdout_gen = run_program(instructions.copy(), stdin=stdin, stdout=None)
     if len(phase_settings) == 1:
-        return stdout[-1]
-    return amp(instructions, phase_settings[1:], input=stdout)
+        yield from stdout_gen
+    elif feedback_loop and len(phase_settings) == 5:
+        for out_val in amp(instructions, phase_settings[1:], amp_input=stdout_gen):
+            amp_input.append(out_val)
+            yield out_val
+        # amp_input.append(None)
+    else:
+        yield from amp(instructions, phase_settings[1:], amp_input=stdout_gen)
 
 
 def main():
     instructions = np.loadtxt('input.csv', delimiter=',', dtype=np.int)
-    print(max(amp(instructions, perm) for perm in permutations(range(5))))
+    print(max(list(amp(instructions, perm))[-1] for perm in permutations(range(5))))
 
 
 if __name__ == "__main__":
