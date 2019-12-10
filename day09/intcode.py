@@ -19,31 +19,17 @@ class IntCodeComputer(object):
         if verb is not None:
             self.memory[2] = verb
 
-    def get_address(self, param_modes, num_args, offset=0):
+    def get_address(self, param_modes, num_args):
         for i in range(num_args):
             if param_modes[i] == 0:
                 LOG.debug("Argument {}: Absolute Position".format(i))
-                yield self.memory[self.ip + offset + i + 1]
-            elif param_modes[i] == 1:
-                LOG.debug("Argument {}: Immediate".format(i))
-                yield self.ip + offset + i + 1
-            elif param_modes[i] == 2:
-                LOG.debug("Argument {}: Relative".format(i))
-                yield self.relative_base_reg + self.memory[self.ip + offset + i + 1]
-            else:
-                raise RuntimeError("Unknown parameter mode: {}".format(param_modes[i]))
-
-    def get_args(self, param_modes, num_args):
-        for i in range(num_args):
-            if param_modes[i] == 0:
-                LOG.debug("Argument {}: Absolute Position".format(i))
-                yield self.memory[self.memory[self.ip + i + 1]]
-            elif param_modes[i] == 1:
-                LOG.debug("Argument {}: Immediate".format(i))
                 yield self.memory[self.ip + i + 1]
+            elif param_modes[i] == 1:
+                LOG.debug("Argument {}: Immediate".format(i))
+                yield self.ip + i + 1
             elif param_modes[i] == 2:
                 LOG.debug("Argument {}: Relative".format(i))
-                yield self.memory[self.relative_base_reg + self.memory[self.ip + i + 1]]
+                yield self.relative_base_reg + self.memory[self.ip + i + 1]
             else:
                 raise RuntimeError("Unknown parameter mode: {}".format(param_modes[i]))
 
@@ -71,17 +57,17 @@ class IntCodeComputer(object):
 
             if opcode == 1:
                 # ADD
-                arg1, arg2 = self.get_args(param_modes, 2)
-                # dst = self.memory[self.ip + 3]
-                dst, = self.get_address(param_modes[2:], 1, offset=2)
+                arg1, arg2, dst = self.get_address(param_modes, 3)
+                arg1 = self.memory[arg1]
+                arg2 = self.memory[arg2]
                 LOG.debug("Add: {} + {} => *{}".format(arg1, arg2, dst))
                 self.memory[dst] = arg1 + arg2
                 self.ip += 4
             elif opcode == 2:
                 # MULT
-                arg1, arg2 = self.get_args(param_modes, 2)
-                # dst = self.memory[self.ip + 3]
-                dst, = self.get_address(param_modes[2:], 1, offset=2)
+                arg1, arg2, dst = self.get_address(param_modes, 3)
+                arg1 = self.memory[arg1]
+                arg2 = self.memory[arg2]
                 self.memory[dst] = arg1 * arg2
                 self.ip += 4
             elif opcode == 3:
@@ -95,7 +81,8 @@ class IntCodeComputer(object):
                 self.ip += 2
             elif opcode == 4:
                 # STDOUT
-                arg1, = self.get_args(param_modes, 1)
+                arg1, = self.get_address(param_modes, 1)
+                arg1 = self.memory[arg1]
                 if hasattr(self.stdout, 'write'):
                     LOG.debug("Printing...")
                     print(arg1, file=self.stdout)
@@ -103,36 +90,41 @@ class IntCodeComputer(object):
                 self.ip += 2
             elif opcode == 5:
                 # JMPT
-                arg1, arg2 = self.get_args(param_modes, 2)
+                arg1, arg2 = self.get_address(param_modes, 2)
+                arg1 = self.memory[arg1]
+                arg2 = self.memory[arg2]
                 if arg1:
                     self.ip = arg2
                 else:
                     self.ip += 3
             elif opcode == 6:
                 # JMPF
-                arg1, arg2 = self.get_args(param_modes, 2)
+                arg1, arg2 = self.get_address(param_modes, 2)
+                arg1 = self.memory[arg1]
+                arg2 = self.memory[arg2]
                 if arg1 == 0:
                     self.ip = arg2
                 else:
                     self.ip += 3
             elif opcode == 7:
                 # LT
-                arg1, arg2 = self.get_args(param_modes, 2)
-                # dst = self.memory[self.ip + 3]
-                dst, = self.get_address(param_modes[2:], 1, offset=2)
+                arg1, arg2, dst = self.get_address(param_modes, 3)
+                arg1 = self.memory[arg1]
+                arg2 = self.memory[arg2]
                 self.memory[dst] = int(arg1 < arg2)
                 self.ip += 4
             elif opcode == 8:
                 # EQ
-                arg1, arg2 = self.get_args(param_modes, 2)
-                # dst = self.memory[self.ip + 3]
-                dst, = self.get_address(param_modes[2:], 1, offset=2)
+                arg1, arg2, dst = self.get_address(param_modes, 3)
+                arg1 = self.memory[arg1]
+                arg2 = self.memory[arg2]
                 LOG.debug("Equal: {} == {} => *{}".format(arg1, arg2, dst))
                 self.memory[dst] = int(arg1 == arg2)
                 self.ip += 4
             elif opcode == 9:
                 # REL BASE
-                arg1, = self.get_args(param_modes, 1)
+                arg1, = self.get_address(param_modes, 1)
+                arg1 = self.memory[arg1]
                 self.relative_base_reg += arg1
                 self.ip += 2
             elif opcode == 99:
