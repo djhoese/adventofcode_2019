@@ -16,17 +16,18 @@ def patient_generator(growing_list):
 
 
 class Robot:
-    def __init__(self, grid_size=(100, 100)):
+    def __init__(self, initial_panel=0, initial_pos=(50, 50), grid_size=(100, 100)):
         # row, col
-        self._pos = (50, 50)
+        self._pos = initial_pos
         # 0 = up
         # 1 = right
         # 2 = down
         # 3 = left
         self._dir = 0  # up
         self.grid_size = grid_size
-        self.grid_state = np.zeros(grid_size)
+        self.grid_state = np.zeros(grid_size, dtype=np.uint8)
         self.grid_painted = np.zeros(grid_size)
+        self.grid_state[self._pos[0], self._pos[1]] = initial_panel
         self._stdin_colors = [self.grid_state[self._pos[0], self._pos[1]]]
         self._stdin = patient_generator(self._stdin_colors)
         self.computer = IntCodeComputer(stdin=self._stdin)
@@ -61,9 +62,11 @@ class Robot:
 def main():
     args, file_in = parse_args()
     instructions = np.loadtxt(file_in, delimiter=',', dtype=np.int)
-    robot = Robot()
+    # robot = Robot(grid_size=(100, 100), initial_pos=(50, 50), initial_panel=0)  # part 1
+    robot = Robot(grid_size=(10, 48), initial_pos=(0, 5), initial_panel=1)  # part 2
     robot.run(instructions)
-    print(robot.panels_painted)
+    print(robot.panels_painted)  # part 1
+    print(robot.grid_state)  # part 2
 
 
 if __name__ == "__main__":
