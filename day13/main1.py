@@ -1,8 +1,6 @@
 import sys
 import numpy as np
 from intcode import IntCodeComputer, parse_args
-from itertools import repeat
-import select
 from time import sleep
 
 
@@ -65,8 +63,8 @@ def run_game(instructions):
     controller = [0]
     stdin = patient_generator(controller, default=sys.stdin if human else 0)
     computer = IntCodeComputer(stdin=stdin, stdout=None)
-    # insert token
     if tokens:
+        # insert token
         instructions[0] = tokens
     comp_gen = computer.run(instructions)
     rows = 22
