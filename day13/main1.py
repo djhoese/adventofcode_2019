@@ -45,10 +45,10 @@ def patient_generator(growing_list, default=None):
     while True:
         if idx >= len(growing_list):
             if default is not None:
-                yield KEY_MAP[getch()]
-                # yield KEY_MAP[input("Controller: ")]
-                # print("Yielding default")
-                # yield default
+                if default is sys.stdin:
+                    yield KEY_MAP[getch()]
+                else:
+                    yield default
             continue
         val = growing_list[idx]
         if val is None:
@@ -60,12 +60,14 @@ def patient_generator(growing_list, default=None):
 def run_game(instructions):
     # tokens = 0  # part 1
     tokens = 2  # part 2
+    human = False
 
     controller = [0]
-    stdin = patient_generator(controller, default=0)
+    stdin = patient_generator(controller, default=sys.stdin if human else 0)
     computer = IntCodeComputer(stdin=stdin, stdout=None)
     # insert token
-    instructions[0] = tokens
+    if tokens:
+        instructions[0] = tokens
     comp_gen = computer.run(instructions)
     rows = 22
     cols = 35
@@ -75,25 +77,40 @@ def run_game(instructions):
     x_pos = next(comp_gen)
     y_pos = next(comp_gen)
     tile_id = next(comp_gen)
+    paddle = (0, 0)
+    sleep_time = 0.0
+    score_str = ""
 
     while True:
         if x_pos == -1 and y_pos == 0:
-            print("Score: ", tile_id)
+            score_str = f"Score: {tile_id:d}"
         else:
             game_canvas[y_pos, x_pos] = tile_id
             num_blocks += int(tile_id == 2)
+            if tile_id == 4:
+                # ball
+                if paddle[1] != x_pos and y_pos < paddle[0]:
+                    controller.append(1 if paddle[1] < x_pos else -1)
+            elif tile_id == 3:
+                paddle = (y_pos, x_pos)
+                sleep_time = 0.05
 
-            for row in game_canvas:
-                print(canvas_row.format(*(CANVAS_SYMBOLS[x] for x in row)))
+            if human:
+                for row in game_canvas:
+                    print(canvas_row.format(*(CANVAS_SYMBOLS[x] for x in row)))
+                print(score_str)
 
         x_pos = next(comp_gen, None)
         y_pos = next(comp_gen, None)
         tile_id = next(comp_gen, None)
         if tile_id is None:
-            print("Tile ID is None")
             break
-        # sleep(0.01)
-    # print(num_blocks)  # part 1
+        if human:
+            sleep(sleep_time)
+    if tokens:
+        print(score_str)  # part 2
+    else:
+        print(num_blocks)  # part 1
 
 
 def main():
