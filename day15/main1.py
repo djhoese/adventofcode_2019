@@ -1,6 +1,5 @@
 import sys
 import numpy as np
-import random
 from intcode import IntCodeComputer, parse_args
 
 
@@ -44,9 +43,9 @@ def robot_dir(d):
 
 class RepairDroid(object):
     def __init__(self, instructions):
-        self.ship_map = np.zeros((50, 50), dtype=np.int)
+        self.ship_map = np.zeros((41, 41), dtype=np.int)
         self.ship_map[:] = -1
-        self.start = (25, 25)  # row, col
+        self.start = (21, 21)  # row, col
         self.ship_map[self.start[0], self.start[1]] = 0  # been there
         self.input_commands = []
         stdin = patient_generator(self.input_commands)
@@ -76,7 +75,7 @@ class RepairDroid(object):
             future_moves.append(possible_dir)
         return future_moves
 
-    def test_movement(self, curr_pos, directions):
+    def test_movement(self, curr_pos, base_path, directions):
         for direction in directions[:-1]:
             # we've already been to these spots, they better be valid
             self.input_commands.append(robot_dir(direction))
@@ -85,27 +84,25 @@ class RepairDroid(object):
 
         self.input_commands.append(robot_dir(directions[-1]))
         status = next(self.robot_gen)
-        if status == 2:
-            return len(directions)
         next_pos = next_position(curr_pos, directions[-1])
         if status == 0:
             # wall
             self.ship_map[next_pos[0], next_pos[1]] = -2  # wall
             future_moves = None
             directions = directions[:-1]  # cut off the last movement when we undo them
-        elif status == 1:
+        elif status in [1, 2]:
             # did the movement
-            self.ship_map[next_pos[0], next_pos[1]] = len(directions)
-            future_moves = self.get_future_moves(next_pos, len(directions) + 1, directions[-1])
+            self.ship_map[next_pos[0], next_pos[1]] = len(base_path) + len(directions)
+            future_moves = self.get_future_moves(next_pos, len(base_path) + len(directions) + 1, directions[-1])
 
         # undo the movements we've done
         for direction in directions[::-1]:
             self.input_commands.append(robot_dir(self.reverse_direction(direction)))
             next(self.robot_gen)
 
-        if future_moves is None:
-            return None
-        return [directions + [fm] for fm in future_moves]
+        if future_moves is None and status != 2:
+            return None, status == 2
+        return [directions + [fm] for fm in future_moves], status == 2
 
     def search_for_position(self):
         curr_pos = self.start
@@ -113,26 +110,55 @@ class RepairDroid(object):
         loops_run = 0
 
         paths = [[x] for x in self.get_future_moves(curr_pos, num_steps, None)]
-        while num_steps == 0:
+        base_path = []
+        oxy_path = None
+        while paths:
             new_paths = []
-            print(paths[0])
             for path in paths:
-                result = self.test_movement(curr_pos, path)
+                result, found_it = self.test_movement(curr_pos, base_path, path)
                 if result is None:
                     # hit a wall, couldn't go further
+                    # the wall is the last element of the path
                     continue
                 elif isinstance(result, list):
-                    for fm in result:
-                        new_paths.append(fm)
-                else:
-                    print("Found it!: ", result)
-                    num_steps = result
-                    break
+                    if found_it:
+                        oxy_path = base_path + path
+                        num_steps = len(oxy_path)  # part 1
+                        for fm in result:
+                            new_paths.append(fm)
+                    else:
+                        for fm in result:
+                            new_paths.append(fm)
+            # shorten how far each path has to go
+            idx = 0
+            if not new_paths:
+                # we have nothing else to look for
+                print("Done")
+                break
+            if len(new_paths) > 1:
+                while all([p[:idx] == new_paths[0][:idx] for p in new_paths[1:]]):
+                    idx += 1
+                idx -= 1
+            new_base = new_paths[0][:idx]
+            base_path += new_base
+            new_paths = [p[idx:] for p in new_paths]
             paths = new_paths
             loops_run += 1
-            if loops_run % 10000 == 0:
-                print(self.ship_map)
-                break
+
+            # the drone is back where this loop started, we have to move it to base path
+            for path_elem in new_base:
+                self.input_commands.append(robot_dir(path_elem))
+                next(self.robot_gen)
+                curr_pos = next_position(curr_pos, path_elem)
+            if not in_map(curr_pos, self.ship_map.shape):
+                raise RuntimeError("We are outside the map!")
+        idx = 0
+        long_path = base_path + paths[0]
+        while oxy_path[:idx] == long_path[:idx]:
+            idx += 1
+        idx -= 1
+        longest_oxy_fill = len(oxy_path[idx:]) + len(long_path[idx:])
+        print(longest_oxy_fill)  # part 2
         return num_steps
 
 
