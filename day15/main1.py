@@ -42,61 +42,105 @@ def robot_dir(d):
     }[d]
 
 
+class RepairDroid(object):
+    def __init__(self, instructions):
+        self.ship_map = np.zeros((50, 50), dtype=np.int)
+        self.ship_map[:] = -1
+        self.start = (25, 25)  # row, col
+        self.ship_map[self.start[0], self.start[1]] = 0  # been there
+        self.input_commands = []
+        stdin = patient_generator(self.input_commands)
+        self.robot = IntCodeComputer(stdin=stdin, stdout=None)
+        self.robot_gen = self.robot.run(instructions)
+
+    def reverse_direction(self, d):
+        return {0: 2, 1: 3, 2: 0, 3:1}.get(d)
+
+    def get_future_moves(self, curr_pos, num_steps, prev_dir):
+        future_moves = []
+        reverse_dir = self.reverse_direction(prev_dir)
+        for possible_dir in [x for x in [0, 1, 2, 3] if x != reverse_dir]:
+            next_pos = next_position(curr_pos, possible_dir)
+            if not in_map(next_pos, self.ship_map.shape):
+                # we would go off the array
+                continue
+
+            next_val = self.ship_map[next_pos[0], next_pos[1]]
+            if next_val == -2:
+                # known wall
+                continue
+            elif next_val != -1 and num_steps >= next_val:
+                # we've been to this square before and didn't
+                # get here faster
+                continue
+            future_moves.append(possible_dir)
+        return future_moves
+
+    def test_movement(self, curr_pos, directions):
+        for direction in directions[:-1]:
+            # we've already been to these spots, they better be valid
+            self.input_commands.append(robot_dir(direction))
+            next(self.robot_gen)
+            curr_pos = next_position(curr_pos, direction)
+
+        self.input_commands.append(robot_dir(directions[-1]))
+        status = next(self.robot_gen)
+        if status == 2:
+            return len(directions)
+        next_pos = next_position(curr_pos, directions[-1])
+        if status == 0:
+            # wall
+            self.ship_map[next_pos[0], next_pos[1]] = -2  # wall
+            future_moves = None
+            directions = directions[:-1]  # cut off the last movement when we undo them
+        elif status == 1:
+            # did the movement
+            self.ship_map[next_pos[0], next_pos[1]] = len(directions)
+            future_moves = self.get_future_moves(next_pos, len(directions) + 1, directions[-1])
+
+        # undo the movements we've done
+        for direction in directions[::-1]:
+            self.input_commands.append(robot_dir(self.reverse_direction(direction)))
+            next(self.robot_gen)
+
+        if future_moves is None:
+            return None
+        return [directions + [fm] for fm in future_moves]
+
+    def search_for_position(self):
+        curr_pos = self.start
+        num_steps = 0
+        loops_run = 0
+
+        paths = [[x] for x in self.get_future_moves(curr_pos, num_steps, None)]
+        while num_steps == 0:
+            new_paths = []
+            print(paths[0])
+            for path in paths:
+                result = self.test_movement(curr_pos, path)
+                if result is None:
+                    # hit a wall, couldn't go further
+                    continue
+                elif isinstance(result, list):
+                    for fm in result:
+                        new_paths.append(fm)
+                else:
+                    print("Found it!: ", result)
+                    num_steps = result
+                    break
+            paths = new_paths
+            loops_run += 1
+            if loops_run % 10000 == 0:
+                print(self.ship_map)
+                break
+        return num_steps
+
+
 def main():
     args, file_in = parse_args()
     instructions = np.loadtxt(file_in, delimiter=',', dtype=np.int)
-
-    ship_map = np.zeros((50, 50), dtype=np.int)
-    start = (25, 25)  # row, col
-    ship_map[start[0], start[1]] = 2  # been there
-    curr_pos = start
-    prev_dir = 0
-    input_commands = [robot_dir(prev_dir)]
-    stdin = patient_generator(input_commands)
-    robot = IntCodeComputer(stdin=stdin, stdout=None)
-    robot_gen = robot.run(instructions)
-    status = next(robot_gen)
-    step = 0
-    while status != 2:
-        # print("Next movement loop: ", status)
-        # figure out where to go next
-        if status == 0:
-            next_pos = next_position(curr_pos, prev_dir)
-            ship_map[next_pos[0], next_pos[1]] = -1  # wall
-            # prev_dir = (prev_dir + 1) % 4
-            # prev_dir = random.choice([x for x in [0, 1, 2, 3] if x != prev_dir])
-        elif status == 1:
-            curr_pos = next_position(curr_pos, prev_dir)
-            ship_map[curr_pos[0], curr_pos[1]] = 2  # been there
-            # keep going in the same direction if we haven't hit a wall yet
-        else:
-            raise ValueError("Unexpected status: ", status)
-
-        possible_directions = []
-        for possible_dir in [0, 1, 2, 3]:
-            next_pos = next_position(curr_pos, possible_dir)
-            print(curr_pos, possible_dir, next_pos, ship_map[next_pos[0], next_pos[1]])
-            if in_map(next_pos, ship_map.shape) and ship_map[next_pos[0], next_pos[1]] in [0, 2]:
-                possible_directions.append(possible_dir)
-        if not possible_directions:
-            ship_map[start[0], start[1]] = 5
-            print(ship_map)
-            return
-
-        prev_dir = random.choice(possible_directions)
-        input_commands.append(robot_dir(prev_dir))
-        status = next(robot_gen)
-        step += 1
-        if step % 200000 == 0:
-            ship_map[start[0], start[1]] = 6
-            print(ship_map)
-            return
-    oxy_pos = next_position(curr_pos, prev_dir)
-    ship_map[start[0], start[1]] = 9
-    ship_map[oxy_pos[0], oxy_pos[1]] = 7
-    print("Steps to find it: ", step, start, oxy_pos)
-    print(ship_map)
-    print("Fewest movements to oxygen: ", abs(oxy_pos[0] - start[0]) + abs(oxy_pos[1] - start[1]))
+    repair_droid = RepairDroid(instructions)
+    print(repair_droid.search_for_position())
 
 
 if __name__ == "__main__":
